@@ -503,4 +503,31 @@ describe LogStash::Inputs::HTTP_Poller do
     let(:config) { default_opts }
     it_behaves_like "an interruptible input plugin"
   end
+
+  describe "a response containing HAL links" do
+    let(:payload) { {"a" => 2, "_links" => { "next" => { "href" => "http://localhost/page=2"}} } }
+    let(:response_body) { LogStash::Json.dump(payload) }
+    let(:opts) { default_opts }
+    let(:instance) {
+      klass.new(opts)
+    }
+    let(:name) { default_name }
+    let(:url) { default_url }
+    let(:code) { 202 }
+
+    before do
+      instance.register
+      u = url.is_a?(Hash) ? url["url"] : url # handle both complex specs and simple string URLs
+      instance.client.stub(u,
+                           :body => response_body,
+                           :code => code
+      )
+      allow(instance).to receive(:decorate)
+      instance.send(:run_once, queue)
+    end
+
+    it "should try to follow the link in the response" do
+      expect(event).to_not be_nil
+    end
+  end
 end

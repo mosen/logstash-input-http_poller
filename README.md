@@ -1,6 +1,10 @@
-# Logstash HTTP input plugin
+# Logstash HTTP input plugin (+ HAL)
 
-[![Travis Build Status](https://travis-ci.org/logstash-plugins/logstash-input-http_poller.svg)](https://travis-ci.org/logstash-plugins/logstash-input-http_poller)
+This fork adds following "next" links in JSON responses to support pagination of records.
+
+Original docs below
+
+---
 
 This plugin is based off [logstash-input-rest](https://github.com/maximede/logstash-input-rest) by @maximede.
 

@@ -6,10 +6,10 @@ require "socket" # for Socket.gethostname
 require "manticore"
 require "rufus/scheduler"
 
-class LogStash::Inputs::HTTP_Poller < LogStash::Inputs::Base
+class LogStash::Inputs::HTTP_Poller_HAL < LogStash::Inputs::Base
   include LogStash::PluginMixins::HttpClient
 
-  config_name "http_poller"
+  config_name "http_poller_hal"
 
   default :codec, "json"
 
@@ -34,6 +34,12 @@ class LogStash::Inputs::HTTP_Poller < LogStash::Inputs::Base
   # Set this value to the name of the field you'd like to store a nested
   # hash of metadata.
   config :metadata_target, :validate => :string, :default => '@metadata'
+
+  # Set this if the response body includes a `links` section which links to the next page in the result set.
+  config :follow_hal_links, :validate => :boolean, :default => true
+
+  # Assuming the response is JSON, this key should describe the path to the URI of the next page in the result set.
+  config :hal_link_key, :validate => :string, :default => '_links.next.href'
 
   public
   Schedule_types = %w(cron every at in)
@@ -166,6 +172,20 @@ class LogStash::Inputs::HTTP_Poller < LogStash::Inputs::Base
       decode_and_flush(@codec, body) do |decoded|
         event = @target ? LogStash::Event.new(@target => decoded.to_hash) : decoded
         handle_decoded_event(queue, name, request, response, event, execution_time)
+
+        if @follow_hal_links
+          @logger.debug("Following HAL Links from the Response")
+          h = decoded.to_hash
+          link = h.dig(*@hal_link_key.split('.'))
+
+          if link.nil?
+            @logger.error("Failed to retrieve HAL link from response, may just be the end of the result set.")
+          else
+            prev_method, prev_url, prev_spec = request
+            request_async(queue, link.to_s, [:get, link.to_s, prev_spec])
+            client.execute!
+          end
+        end
       end
     else
       event = ::LogStash::Event.new
